@@ -1,153 +1,181 @@
-#include <getopt.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "helpers.h"
+#include <math.h>
+#include <stdio.h>
 
-int main(int argc, char *argv[])
+// Convert image to grayscale
+
+// 1) Find individual red, blue, green values for pixel
+// 2) Calculate average pixel value from these three values
+// 3) Set each RGB value to average value
+
+void grayscale(int height, int width, RGBTRIPLE image[height][width])
 {
+	// Iterate through rows of 2d pixel array
+	for (int i = 0; i < height; i++)
+	{
+		// Iterate columns
+		for (int j = 0; j < width; j++)
+		{
+			// Find int values for RGB values
+			float red = image[i][j].rgbtRed;
+			float green = image[i][j].rgbtGreen;
+			float blue = image[i][j].rgbtBlue;
+			
+			// Calculate average color value
+			float average = (blue + green + red) / 3;
+			average = round(average);
 
-    // Define allowable filters
-    char *filters = "bgrs";
+			// Reassign RGB values to average value
+			image[i][j].rgbtRed = average;
+			image[i][j].rgbtGreen = average;
+			image[i][j].rgbtBlue = average;
+		}
+	}
+    return;
+}
 
-    // Get filter flag and check validity
-    char filter = getopt(argc, argv, filters);
-    if (filter == '?')
+// Convert image to sepia
+
+// 1) Find individual red, blue, green values for pixel
+// 2) Calculate sepia pixel values from these three values
+// 3) Set each RGB value to sepia values
+
+void sepia(int height, int width, RGBTRIPLE image[height][width])
+{
+	// Iterate through rows of 2d pixel array
+	for (int i = 0; i < height; i++)
+	{
+		// Iterate through columns
+		for (int j = 0; j < width; j++)
+		{
+			// Find int values for RGB values
+			float red = image[i][j].rgbtRed;
+			float green = image[i][j].rgbtGreen;
+			float blue = image[i][j].rgbtBlue;
+
+			// Calculate Sepia values
+			int sepiaRed = round(.393 * red + .769 * green + .189 * blue);
+  			int sepiaGreen = round(.349 * red + .686 * green + .168 * blue);
+  			int sepiaBlue = round(.272 * red + .534 * green + .131 * blue);
+
+  			// If Sepia value exceeds 255, cap it at 255
+  			// Assign pixel to Sepia value
+  			if (sepiaRed < 256)
+  			{
+  				image[i][j].rgbtRed = sepiaRed;
+  			}
+  			else
+  			{
+  				image[i][j].rgbtRed = 255;
+  			}
+  			if (sepiaGreen < 256)
+  			{
+  				image[i][j].rgbtGreen = sepiaGreen;
+  			}
+  			else
+  			{
+  				image[i][j].rgbtGreen = 255;
+  			}
+  			if (sepiaBlue < 256)
+  			{
+  				image[i][j].rgbtBlue = sepiaBlue;
+  			}
+  			else
+  			{
+  				image[i][j].rgbtBlue= 255;
+  			}
+		}
+	}
+    return;
+}
+
+// Reflect image horizontally
+
+// 1) Iterate through rows of pixels
+// 2) Swap elements by taking current element and popping it to end of array minus iterator
+//    to produce this:
+// 		[1,2,3,4,5,6]
+// 		[6,5,4,3,2,1]
+// 
+
+void reflect(int height, int width, RGBTRIPLE image[height][width])
+{
+	// Iterate through rows of 2d pixel array
+	for (int i = 0; i < height; i++)
+	{
+		// Iterate through columns
+		for (int j = 0; j < width/2; j++)
+		{
+			// Use variable temp as a placeholder for swapping elements
+			RGBTRIPLE temp;
+
+			temp = image[i][j];
+			image[i][j] = image[i][width-j];
+			image[i][width-j] = temp;
+		}
+	}
+    return;
+}
+
+// Blur image
+
+// 1. Identify neighboring pixel pattern
+// 2. Calculate average RGB value of pattern
+// 3. Set each neighboring pixel value to average
+
+void blur(int height, int width, RGBTRIPLE image[height][width])
+{  
+	// Iterate through rows of 2d pixel array
+    for (int i = 0; i < height; i++) // goes over entire image i for rows (height), j for columns (width)
     {
-        fprintf(stderr, "Invalid filter.\n");
-        return 1;
-    }
-
-    // Ensure only one filter
-    if (getopt(argc, argv, filters) != -1)
-    {
-        fprintf(stderr, "Only one filter allowed.\n");
-        return 2;
-    }
-
-    // Ensure proper usage
-    if (argc != optind + 2)
-    {
-        fprintf(stderr, "Usage: filter [flag] infile outfile\n");
-        return 3;
-    }
-
-    // Remember filenames
-    char *infile = argv[optind];
-    char *outfile = argv[optind + 1];
-
-    // Open input file
-    FILE *inptr = fopen(infile, "r");
-    if (inptr == NULL)
-    {
-        fprintf(stderr, "Could not open %s.\n", infile);
-        return 4;
-    }
-
-    // Open output file
-    FILE *outptr = fopen(outfile, "w");
-    if (outptr == NULL)
-    {
-        fclose(inptr);
-        fprintf(stderr, "Could not create %s.\n", outfile);
-        return 5;
-    }
-
-    // Read infile's BITMAPFILEHEADER
-    BITMAPFILEHEADER bf;
-    fread(&bf, sizeof(BITMAPFILEHEADER), 1, inptr);
-
-    // Read infile's BITMAPINFOHEADER
-    BITMAPINFOHEADER bi;
-    fread(&bi, sizeof(BITMAPINFOHEADER), 1, inptr);
-
-    // Ensure infile is (likely) a 24-bit uncompressed BMP 4.0
-    if (bf.bfType != 0x4d42 || bf.bfOffBits != 54 || bi.biSize != 40 ||
-        bi.biBitCount != 24 || bi.biCompression != 0)
-    {
-        fclose(outptr);
-        fclose(inptr);
-        fprintf(stderr, "Unsupported file format.\n");
-        return 6;
-    }
-
-    int height = abs(bi.biHeight);
-    int width = bi.biWidth;
-
-    // Allocate memory for image
-    RGBTRIPLE(*image)[width] = calloc(height, width * sizeof(RGBTRIPLE));
-    if (image == NULL)
-    {
-        fprintf(stderr, "Not enough memory to store image.\n");
-        fclose(outptr);
-        fclose(inptr);
-        return 7;
-    }
-
-    // Determine padding for scanlines
-    int padding = (4 - (width * sizeof(RGBTRIPLE)) % 4) % 4;
-
-    // Iterate over infile's scanlines
-    for (int i = 0; i < height; i++)
-    {
-        // Read row into pixel array
-        fread(image[i], sizeof(RGBTRIPLE), width, inptr);
-
-        // Skip over padding
-        fseek(inptr, padding, SEEK_CUR);
-    }
-
-    // Filter image
-    switch (filter)
-    {
-        // Blur
-        case 'b':
-            blur(height, width, image);
-            break;
-
-        // Grayscale
-        case 'g':
-            grayscale(height, width, image);
-            break;
-
-        // Reflection
-        case 'r':
-            reflect(height, width, image);
-            break;
-
-        // Sepia
-        case 's':
-            sepia(height, width, image);
-            break;
-    }
-
-    // Write outfile's BITMAPFILEHEADER
-    fwrite(&bf, sizeof(BITMAPFILEHEADER), 1, outptr);
-
-    // Write outfile's BITMAPINFOHEADER
-    fwrite(&bi, sizeof(BITMAPINFOHEADER), 1, outptr);
-
-    // Write new pixels to outfile
-    for (int i = 0; i < height; i++)
-    {
-        // Write row to outfile
-        fwrite(image[i], sizeof(RGBTRIPLE), width, outptr);
-
-        // Write padding at end of row
-        for (int k = 0; k < padding; k++)
+    	// Iterate through columns
+        for (int j = 0; j < width; j++)
         {
-            fputc(0x00, outptr);
+        	// Initialize sum values for rgbt values per byte
+            float sumRed = 0;
+            float sumGreen = 0;
+            float sumBlue = 0;
+
+            // Initialize variable for counting how many pixels are adjacent to current pixel
+            int pixelCount = 0;
+           
+           	// In the example below (Figure 1), x is surrounded by neighboring pixels 1-9
+           	// Refer to this map for help visualizing the conditional statements below
+            // [1][2][3]
+            // [4][x][6]
+            // [7][8][9] 
+
+            // First check each pixel within -1 and +1 of each [i] (ie left to right)
+            for (int k = -1; k < 2; k++)
+            {
+
+            	// Secondly check each pixel within -1 to +1 of each [j] (ie up to down)
+                for (int l = -1; l < 2; l++)
+                {
+                	// Find neighboring pixels and eliminate edge cases:
+                	// (ie, pixels that don't exist if selected pixel is in topmost/bottom rows, leftmost/right columns)
+                	// In order from left to right of conditional statement:
+                	// 1) Does pixel [4] (Fig. 1) exist? 
+                	// 2) Does [2] exist?
+                	// 3) Does [8] exist?
+                	// 4) Does [6] exist?
+
+                    if (i + k >= 0  && j + l >= 0 && i + k <= height - 1 && j + l <= width - 1) // if statement to check
+                    {                                       
+                        // If pixel is within bounds, calculate surrounding pixels' rgbt values and add to sum
+                        sumRed = image[i+k][j+l].rgbtRed + sumRed;                           
+                        sumGreen = image[i+k][j+l].rgbtGreen + sumGreen;
+                        sumBlue = image[i+k][j+l].rgbtBlue + sumBlue;
+                        // Adds +1 to the pixel count to divide by within each [i][j] loop
+                        pixelCount++; 
+                    }
+                }
+            }
+            // Assign pixel the average rgbt values
+            image[i][j].rgbtRed = round(sumRed / pixelCount);
+            image[i][j].rgbtGreen = round(sumGreen / pixelCount);
+            image[i][j].rgbtBlue = round(sumBlue / pixelCount);
         }
     }
-
-    // Free memory for image
-    free(image);
-
-    // Close infile
-    fclose(inptr);
-
-    // Close outfile
-    fclose(outptr);
-
-    return 0;
+    return;
 }
