@@ -24,7 +24,7 @@ for row in db.execute(
     """ SELECT * FROM students
     WHERE house = "{}"
     ORDER BY last_name
-    """.format(houseName)):
+    """.format(houseName)git ):
 
     # Include middle name if student has one
     if row['middle_name'] != "NULL":
