@@ -21,7 +21,10 @@ if houseName not in ["Slytherin", "Gryffindor", "Hufflepuff", "Ravenclaw"]:
 
 # Run SQL query and return a list of all students belonging to house
 for row in db.execute(
-""" SELECT * FROM students WHERE house = "{}" """.format(houseName)):
+    """ SELECT * FROM students
+    WHERE house = "{}"
+    ORDER BY last_name
+    """.format(houseName)):
 
     # Include middle name if student has one
     if row['middle_name'] != "NULL":
